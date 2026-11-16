@@ -16,48 +16,18 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Every skill folder has a valid SKILL.md
-        run: |
-          fail=0
-          for dir in */ ; do
-            dir="${dir%/}"
-            [ "$dir" = ".git" ] && continue
-            [ "$dir" = ".github" ] && continue
-            if [ ! -f "$dir/SKILL.md" ]; then
-              echo "::error::$dir has no SKILL.md"
-              fail=1; continue
-            fi
-            python - "$dir" <<'PY'
-          import re, sys, pathlib
-          d = sys.argv[1]
-          txt = pathlib.Path(d, 'SKILL.md').read_text(encoding='utf-8')
-          m = re.match(r'^---\s*\n(.*?)\n---\s*\n', txt, re.S)
-          if not m:
-              print(f'::error::{d}/SKILL.md has no YAML frontmatter'); sys.exit(1)
-          fm = m.group(1)
-          name = re.search(r'^name:\s*(.+)$', fm, re.M)
-          desc = re.search(r'^description:\s*(.+)$', fm, re.M)
-          if not name or not desc:
-              print(f'::error::{d}/SKILL.md frontmatter needs name and description'); sys.exit(1)
-          if name.group(1).strip().strip('"\'') != d:
-              print(f'::error::{d}: frontmatter name != folder name ({name.group(1).strip()})'); sys.exit(1)
-          if len(desc.group(1).strip()) < 40:
-              print(f'::warning::{d}: description is short — write it so the agent knows WHEN to use it')
-          PY
-            if [ $? -ne 0 ]; then fail=1; fi
-          done
-          exit $fail
+      - name: Validate skill folders
+        run: python .github/scripts/validate_skills.py .
 
       - name: Python scripts compile
         run: |
           files=$(find . -name '*.py' -not -path './.git/*')
-          if [ -z "$files" ]; then echo "no python scripts"; exit 0; fi
           echo "$files"
           python -m py_compile $files
 
-      - name: No oversized files
+      - name: No files over 1MB
         run: |
-          big=$(find . -type f -size +1M -not -path './.git/*' || true)
+          big=$(find . -type f -size +1M -not -path './.git/*')
           if [ -n "$big" ]; then
             echo "$big"
             echo "::error::files over 1MB — keep binaries out of the repo"

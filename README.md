@@ -9,7 +9,7 @@
 
 | 技能 | 一句话 | 依赖 |
 | --- | --- | --- |
-| [html-screen-design-source](html-screen-design-source/) | 把渲染好的 HTML 大屏转成分层、逐像素验收过的 SVG 设计源，可干净导入 Figma / 蓝湖 / MasterGo | playwright + numpy + pillow |
+| [html-screen-to-design-source](html-screen-to-design-source/) | 把渲染好的 HTML 大屏转成分层、逐像素验收过的 SVG 设计源，可干净导入 Figma / 蓝湖 / MasterGo | playwright + numpy + pillow |
 
 > 想加新技能：新建文件夹 → 写 `SKILL.md` → 在 README 表格里加一行 → 提 PR / 直接 push。
 
@@ -21,7 +21,7 @@
 git clone https://github.com/xueyue88888888-arch/skills ~/skills-src
 
 # 让 agent 用其中之一：把技能目录链接/拷贝到它扫描的位置
-ln -s ~/skills-src/html-screen-design-source ~/.config/alma/skills/html-screen-to-design-source
+ln -s ~/skills-src/html-screen-to-design-source ~/.config/alma/skills/html-screen-to-design-source
 # Windows: mklink /D "%USERPROFILE%\.config\alma\skills\html-screen-to-design-source" "%USERPROFILE%\skills-src\html-screen-design-source"
 ```
 
