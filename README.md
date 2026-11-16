@@ -32,9 +32,10 @@ result.
 **As an Alma / Claude-style skill** (folder contains `SKILL.md`):
 
 ```bash
-git clone <this-repo> ~/.config/alma/skills/html-screen-design-source
-# or
-npx skills add <owner>/<repo>@html-screen-to-design-source
+git clone https://github.com/xueyue88888888-arch/SKILL-html-screen-design-source   ~/.config/alma/skills/html-screen-to-design-source
+
+# or, if you use a skills registry / agent that supports npx
+npx skills add xueyue88888888-arch/SKILL-html-screen-design-source@html-screen-to-design-source
 ```
 
 **Requirements**
