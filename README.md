@@ -18,7 +18,7 @@
 ### 整仓 clone（推荐给自己用）
 
 ```bash
-git clone https://github.com/xueyue88888888-arch/skills ~/skills-src
+git clone https://github.com/xueyue88888888-arch/xueyue_sklls ~/skills-src
 
 # 让 agent 用其中之一：把技能目录链接/拷贝到它扫描的位置
 ln -s ~/skills-src/html-screen-to-design-source ~/.config/alma/skills/html-screen-to-design-source
@@ -28,7 +28,7 @@ ln -s ~/skills-src/html-screen-to-design-source ~/.config/alma/skills/html-scree
 ### 只装一个技能
 
 ```bash
-npx skills add xueyue88888888-arch/skills@html-screen-to-design-source
+npx skills add xueyue88888888-arch/xueyue_sklls@html-screen-to-design-source
 ```
 
 ### 直接问 agent

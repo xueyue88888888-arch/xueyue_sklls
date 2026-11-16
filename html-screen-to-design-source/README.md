@@ -33,11 +33,11 @@ result.
 
 ```bash
 # this skill lives in a monorepo: one repo, one folder per skill
-git clone https://github.com/xueyue88888888-arch/skills ~/skills-src
+git clone https://github.com/xueyue88888888-arch/xueyue_sklls ~/skills-src
 ln -s ~/skills-src/html-screen-design-source ~/.config/alma/skills/html-screen-to-design-source
 
 # or install just this one
-npx skills add xueyue88888888-arch/skills@html-screen-to-design-source
+npx skills add xueyue88888888-arch/xueyue_sklls@html-screen-to-design-source
 ```
 
 **Requirements**
