@@ -1,0 +1,21 @@
+{
+  "base_svg": "work/base.svg",
+  "font_family": "Inter, 'Noto Sans SC', sans-serif",
+  "clips": [
+    {"id": "clip-photo-hero", "target": "photo__hero", "x": 40, "y": 253, "w": 705, "h": 285}
+  ],
+  "glows": [
+    {"id": "fx-txt-primary", "blur": 8, "color": "#6ac8ff", "opacity": 0.5},
+    {"id": "fx-txt-accent",  "blur": 7, "color": "#ffd55a", "opacity": 0.35}
+  ],
+  "text_buckets": [
+    {"fill": "rgb(237, 248, 255)", "min_size": 15, "glow": "fx-txt-primary"},
+    {"fill": "rgb(243, 215, 125)", "min_size": 20, "glow": "fx-txt-accent"}
+  ],
+  "assets": {
+    "panelbg__main":   {"file": "assets/bg/panel-main.png",   "x": 15, "y": 192, "w": 735, "h": 499},
+    "card__kpi":       {"file": "assets/cards/kpi-1.png",     "x": 780, "y": 261, "w": 290, "h": 80, "drop_children": true},
+    "photo__hero":     {"file": "assets/photos/hero.png",     "x": 30, "y": 253, "w": 705, "h": 285, "clear_clip": true}
+  },
+  "dedupe": false
+}

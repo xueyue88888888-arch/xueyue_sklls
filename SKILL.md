@@ -1,0 +1,170 @@
+---
+name: html-screen-to-design-source
+description: Convert a rendered HTML dashboard / fixed-canvas "big screen" into a layered, pixel-verified SVG design source that imports cleanly into Figma, Lanhu, MasterGo or any design-handoff tool. Use when someone asks to turn an HTML screen into a design source, assemble cut assets into an SVG, make an SVG match its HTML 1:1, hand a dashboard to FVS/BI developers, or debug design-tool imports where images disappear, text turns black, layers can't be selected, or exports come out with white backgrounds.
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+---
+
+# HTML Screen → Design Source
+
+Turn a **rendered** HTML dashboard into a **layered** SVG design source, verified against the render itself — not against your impression of it.
+
+The output is one SVG that:
+- looks like the HTML to within a measured pixel difference,
+- keeps every text run as real `<text>`,
+- keeps every card / icon / photo as its own slice,
+- survives import into design tools (no masks, no gradient text, no `<use>`, no white mattes),
+- ships with an asset folder where every embedded byte is traceable to a file.
+
+---
+
+## 0. Ground rules
+
+1. **The render is the source of truth.** Never hand-place anything from reading CSS. Measure, place, then verify with a diff.
+2. **Freeze the page first.** A page with timers, random data or CSS animation cannot be measured or compared.
+3. **Never patch a generated file by hand, round after round.** Keep a clean input and one idempotent build script. Hand-patches accumulate duplicate layers and duplicate ids.
+4. **Every step ends with a number.** "Looks fine" is not a result; `mean abs diff 5.6 / strong 1.9%` is.
+5. **Ask for / confirm:** canvas size, font substitution policy, per-request upload limits (base64 in chat blows up fast — work locally with scripts).
+
+---
+
+## 1. Freeze the runtime
+
+Find the page's dynamics and switch them off behind one flag:
+
+```js
+// top of the app's main script
+const STATIC_MODE = !/[?&]live=1/.test(location.search);
+```
+
+Disable while `STATIC_MODE`:
+- chart entry/update animations (`animation: false`; delay-based `setOption({animation:true})`)
+- renderer effects that self-animate (e.g. ECharts `effectScatter` → `rippleEffect.scale = 0`)
+- polling / `setInterval` refresh and any "insert new row every N seconds" behaviour
+- clock-derived text → replace with fixed constant strings
+
+**Acceptance:** render twice, hash both screenshots. Allowed delta ≈ 0.05% pixels (sub-pixel leftovers). Anything bigger means something still moves — find it before continuing.
+
+---
+
+## 2. Measure the DOM
+
+Playwright, viewport == canvas size, `deviceScaleFactor=1`. Dump JSON:
+
+- `img` elements: rendered rect, `object-fit`
+- elements with a `background-image` (icons, gradient ornaments, pattern fills)
+- structural blocks (`.panel`, `.card`, `.kpi`, …) by rect
+- text runs: `x/y/w/h`, `fontSize`, `fontWeight`, `color`, `textAlign`, `letterSpacing`, `textShadow`
+
+`scripts/measure_dom.py` does this. Treat its output as the only geometry truth.
+
+> Stale geometry is the #1 failure mode. If any CSS changed, re-measure — do not reuse yesterday's JSON.
+
+---
+
+## 3. Slice by element type
+
+Each type has exactly one correct method. Getting this wrong is what produces "missing glow", "white background", "double border".
+
+| Element | Method | Why |
+| --- | --- | --- |
+| Module background, card chrome | **In-place capture**: leave the page exactly as rendered, globally make text transparent and remove icon images / `img`, screenshot the element box **expanded by 1px** | The outer glow of a card is the card edge blending with the work *behind* it, and borders often come from ancestor selectors — a detached clone loses both |
+| Strip / bar with CSS `backdrop-filter` | **Bake per module** (include the backdrop) | SVG has no reliable `backdrop-filter`; adding it in SVG makes it worse |
+| Card repeated N times with self-contained styles | Clone into an isolated transparent canvas once → reuse one PNG | Only safe when the element's own rules don't depend on ancestors |
+| Chart (ECharts / Chart.js / canvas) | Drive the chart API to empty out the series you *don't* want, capture per layer at `deviceScaleFactor=3` | `show: false` is unreliable for line/scatter series; emptying `data` is deterministic |
+| Map / illustration with layers | Split base / connectors / markers into separate transparent PNGs; keep place labels as real `<text>` | Lets the reader re-target or restyle layers later |
+| Photo | 1:1 **RGBA PNG** | JPEG or RGB gets white-matted by many tools |
+
+All slices: **RGBA PNG**, transparency captured with `omit_background=True` *after* clearing page/panel/sibling backgrounds.
+
+`scripts/slice_cards.py`, `scripts/slice_charts.py` implement the two hard cases.
+
+---
+
+## 4. Assemble the SVG
+
+Build from a clean base in **one idempotent script** (`scripts/build_svg.py` is a template):
+
+- one font stack for every text run; record the substitution in the delivery notes
+- map each text style bucket (`font-size` + fill) to a `feDropShadow` glow, don't invent per-run values
+- bake anything the design tool can't parse into images (§6)
+- put repeated images in `<defs>` once and reference with `<use>` **only while iterating** — expand before delivery
+- write **one** href per image (`href`, not `href` + `xlink:href`; duplicating the base64 doubles file size)
+- name every layer; ids must be unique
+
+---
+
+## 5. Verify with numbers
+
+Baseline = the same page rendered with the **same substituted font** (inject a `* { font-family: … !important }` style), so text differences reflect glyph shape only.
+
+```
+overall strong  = share of pixels whose max channel delta > 60
+non-text strong = same, excluding padded text boxes
+```
+
+Targets from real deliveries:
+
+| Metric | Target |
+| --- | --- |
+| overall strong diff | < 2.5% |
+| non-text strong diff | < 1% |
+| text placement (per run, best shift within ±3px) | median < 2px, most runs at (0,0) |
+
+`scripts/verify_diff.py` reports all of the above plus the worst regions.
+
+Investigate *why* before tuning: a diff concentrated on edges = slice geometry; a diff on flat areas = wrong asset; a diff on glyphs only = font substitution (expected).
+
+---
+
+## 6. Design-tool compatibility
+
+Every one of these was a real "the import broke" report:
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Background image vanishes | layer carries `mask` | bake the masked result into a PNG, drop the mask |
+| Headline turns black | `fill="url(#gradient)"` (gradient text) | replace with a solid colour from the gradient |
+| Ornament / rule disappears | vector group + `mask` + `feGaussianBlur` + `<style>` | bake at 2× into a PNG |
+| Layers can't be selected | `<use>` references, or deep wrapper groups | expand `<use>`; delete wrapper groups so elements sit at root |
+| White box behind an image | RGB (no alpha) asset, or capture without transparent background | convert to RGBA; scan every PNG for an opaque near-white border |
+| Only one of N images exports | the exporter dedupes by name | normalize `-N` suffixes and mark **every instance** |
+
+`scripts/figma_compat.py` audits an SVG + asset folder against this table.
+
+**Recommended delivered structure** (flat, selectable):
+
+```svg
+<rect data-name="page-bg" />
+<g data-name="panel-bg__sales" data-export="PNG"><image …/></g>
+<g data-name="card__kpi-2"    data-export="PNG"><image …/></g>
+<text data-name="Revenue">Revenue</text>
+```
+
+---
+
+## 7. Package and document
+
+Deliver, next to the SVG:
+
+- asset folders grouped by kind (backgrounds / photos / icons / charts / map)
+- an **asset usage list**: asset file → how many layers reference it → which ones
+- a **traceability check**: hash every embedded image and confirm it exists on disk (target: 0 unmatched)
+- a short self-check report: diff numbers, layer/export counts, file size, known residuals
+
+---
+
+## Reference material
+
+- `references/pitfalls.md` — ranked by cost paid, with the symptom each one caused
+- `references/compat-matrix.md` — design-tool support matrix and workarounds
+- `scripts/` — runnable starting points: `measure_dom.py`, `slice_cards.py`, `slice_charts.py`, `build_svg.py`, `verify_diff.py`, `figma_compat.py`, `asset_index.py`
+
+## One-line usage
+
+> "Use html-screen-to-design-source on this screen: HTML at `<path>`, cut assets at `<path>`, canvas `<W×H>`."
+
+and report back: strong diff / file size / export count / asset match rate.
