@@ -15,7 +15,17 @@
 
 ## 安装 / 使用
 
-### 整仓 clone（推荐给自己用）
+### 同步到本机 agent（推荐）
+
+```powershell
+.\install.ps1                          # Windows：把每个技能同步进 Alma 技能目录
+./install.sh                           # macOS / Linux
+.\install.ps1 -Only html-screen-to-design-source   # 只同步一个
+```
+
+> 用复制而不是软链接：Alma 的技能扫描器不跟随 junction / symlink，链过去会"装了但看不见"。
+
+### 整仓 clone（手动管理）
 
 ```bash
 git clone https://github.com/xueyue88888888-arch/xueyue_sklls ~/skills-src
