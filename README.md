@@ -1,117 +1,52 @@
-# html-screen-to-design-source
+# skills
 
-An agent skill that turns a **rendered** HTML dashboard (fixed-canvas "big screen") into a
-**layered, pixel-verified SVG design source** that imports cleanly into Figma, Lanhu,
-MasterGo or any design-handoff tool.
+个人技能仓库（monorepo）—— 一个仓库放多个 agent skill，一个 clone 管全部。
 
-Built from a real delivery: a 2752×1204 production dashboard with 40 cards, 35 icons,
-11 charts, a layered China map and 191 live text runs, handed off to BI developers.
+每个技能是一个独立文件夹，文件夹根目录必有 `SKILL.md`（YAML frontmatter：`name` + `description`）。
+其余内容（`scripts/`、`references/`、`examples/`）按需。
 
-```
-HTML + cut assets  →  static HTML  →  measured geometry  →  slices
-                   →  layered SVG  →  pixel diff  →  design-tool audit  →  delivery
-```
+## 技能列表
 
-## Why this exists
+| 技能 | 一句话 | 依赖 |
+| --- | --- | --- |
+| [html-screen-design-source](html-screen-design-source/) | 把渲染好的 HTML 大屏转成分层、逐像素验收过的 SVG 设计源，可干净导入 Figma / 蓝湖 / MasterGo | playwright + numpy + pillow |
 
-Converting an HTML screen to a design source looks like "export an SVG". In practice the
-failure modes are all silent:
+> 想加新技能：新建文件夹 → 写 `SKILL.md` → 在 README 表格里加一行 → 提 PR / 直接 push。
 
-- text layers land on top of each other because the page was measured mid-animation
-- images come out with white boxes because the PNG had no alpha
-- card borders and glows disappear because the slice was taken from a detached clone
-- the whole background image vanishes in Figma because the layer carried a `mask`
-- the headline turns black because it used gradient text
-- only 1 of 16 identical cards is exportable because the exporter dedupes by name
+## 安装 / 使用
 
-This skill encodes the method that fixes all of them, plus the numbers used to accept the
-result.
-
-## Install
-
-**As an Alma / Claude-style skill** (folder contains `SKILL.md`):
+### 整仓 clone（推荐给自己用）
 
 ```bash
-git clone https://github.com/xueyue88888888-arch/SKILL-html-screen-design-source   ~/.config/alma/skills/html-screen-to-design-source
+git clone https://github.com/xueyue88888888-arch/skills ~/skills-src
 
-# or, if you use a skills registry / agent that supports npx
-npx skills add xueyue88888888-arch/SKILL-html-screen-design-source@html-screen-to-design-source
+# 让 agent 用其中之一：把技能目录链接/拷贝到它扫描的位置
+ln -s ~/skills-src/html-screen-design-source ~/.config/alma/skills/html-screen-to-design-source
+# Windows: mklink /D "%USERPROFILE%\.config\alma\skills\html-screen-to-design-source" "%USERPROFILE%\skills-src\html-screen-design-source"
 ```
 
-**Requirements**
+### 只装一个技能
 
 ```bash
-pip install playwright numpy pillow
-python -m playwright install chromium    # or point --browser at Edge/Chrome
+npx skills add xueyue88888888-arch/skills@html-screen-to-design-source
 ```
 
-## Use
+### 直接问 agent
 
-Just ask in natural language:
+> 用 **html-screen-design-source** 处理这个稿：HTML 在 `<path>`，切图素材在 `<path>`，画布 `<W×H>`
 
-> Use **html-screen-to-design-source** on this screen: HTML at `page/index.html`,
-> cut assets at `assets/`, canvas `2752×1204`.
+## 约定
 
-The agent will freeze the page, measure it, slice by element type, assemble the SVG,
-verify with pixel diffs, audit design-tool compatibility, and report:
+- **命名**：文件夹名 = 技能名（kebab-case），与 `SKILL.md` 里的 `name` 一致
+- **frontmatter**：`name`、`description` 必填；`description` 要写成"什么时候该用我"，含触发短语
+- **自包含**：技能不能假设仓库外的文件存在；需要外部规范时在 `references/` 里写明路径或直接内联
+- **可验证**：有脚本的必须能 `python -m py_compile` 过；CI 会跑
+- **不塞大文件**：截图/素材走外部路径或 `examples/`，单文件 > 1MB 提 issue 讨论
 
-```
-overall strong diff       1.91%
-non-text strong diff      0.59%
-export layers             94 (61 asset families)
-file size                 12.5 MB
-asset match rate         104/104 layers → 79 files, 0 unmatched
-```
+## CI
 
-## Scripts
-
-| Script | Purpose |
-| --- | --- |
-| `scripts/measure_dom.py` | dump rendered geometry of every img / background-image / block / text run |
-| `scripts/slice_cards.py` | in-place card-chrome slices (text+icons removed, box expanded 1px) |
-| `scripts/slice_charts.py` | split an ECharts canvas into base / connectors / markers + label JSON |
-| `scripts/build_svg.py` | template assembler: clips, text-glow buckets, asset swap, dedupe, size fix |
-| `scripts/verify_diff.py` | baseline-vs-candidate diff: overall / text / non-text strong%, worst regions |
-| `scripts/figma_compat.py` | audits the six import-breaking features, non-zero exit for CI |
-| `scripts/asset_index.py` | proves every embedded image exists on disk; writes the usage list |
-
-## Method in one screen
-
-1. **Freeze** — one `STATIC_MODE` flag kills timers, chart animations and self-animating
-   effects; verify with two hashed renders.
-2. **Measure** — Playwright at canvas size, DPR 1. Never hand-place from CSS.
-3. **Slice by type** — in-place + 1px expansion for anything with an outer glow; bake
-   `backdrop-filter`; empty chart `data` to split layers; photos as RGBA PNG.
-4. **Assemble** — one idempotent build script from a clean base; one font stack; glows from
-   style buckets; one `href` per image.
-5. **Verify** — compare against the same page rendered with the same font; targets:
-   overall strong < 2.5%, non-text < 1%, text placement median < 2px.
-6. **Adapt** — bake masks / CSS filters / gradient text, expand `<use>`, flatten wrapper
-   groups, RGBA everything, mark every export instance.
-7. **Package** — asset folders, usage list, hash traceability, self-check report.
-
-## Repository layout
-
-```
-SKILL.md                      the skill itself (agent-facing instructions)
-references/pitfalls.md        ranked failure modes with symptom → cause → fix
-references/compat-matrix.md   SVG feature × design tool support table
-scripts/                      runnable starting points
-examples/config.example.json  config for build_svg.py
-```
-
-## Limitations
-
-- Built and validated on **Chromium/Edge**; Firefox/Safari sub-pixel rounding differs.
-- The chart splitter assumes **ECharts** (`echarts.getInstanceByDom`). For Chart.js or
-  canvas-based charts, adapt the "empty the data" idea to that library's API.
-- Font substitution always leaves glyph-shape differences; the verifier separates those
-  from real layout errors instead of pretending they are zero.
-- `backdrop-filter` cannot be reproduced in SVG — that slice must be baked.
+`.github/workflows/validate.yml`：每次 push 检查 —— 每个技能有 `SKILL.md` 且 frontmatter 完整、`name` 与目录名一致、所有 Python 脚本语法通过。
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-Contributions welcome, especially: adapters for other chart libraries, a MasterGo/Pixso
-compat table, and CI recipes that run `figma_compat.py` on every build.
+MIT，见 [LICENSE](LICENSE)。各技能若需其他协议，在其目录内单独放 `LICENSE`。
