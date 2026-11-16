@@ -9,7 +9,22 @@
 
 | 技能 | 一句话 | 依赖 |
 | --- | --- | --- |
+| [big-screen-design-brief](big-screen-design-brief/) | 给数据大屏写一份能直接交给 agent 的设计任务书（画布/模块/数据/规范 + 7 条"为了能切图"的硬约束），产出可切图的 HTML 原型 | 无 |
 | [html-screen-to-design-source](html-screen-to-design-source/) | 把渲染好的 HTML 大屏转成分层、逐像素验收过的 SVG 设计源，可干净导入 Figma / 蓝湖 / MasterGo | playwright + numpy + pillow |
+
+### 一条链路
+
+```
+设计师想法
+   ↓  big-screen-design-brief（写任务书：画布、模块、数据、视觉规范、7 条硬约束）
+Agent 产出 HTML 原型
+   ↓  html-screen-to-design-source（静态化 → 量几何 → 切图 → 合成 SVG → 像素验收 → 工具兼容）
+Figma / 蓝湖设计源
+   ↓
+开发（FVS / BI）按标注与切图落地
+```
+
+两块合起来解决的是：**设计师不写代码，也能从"想做一块大屏"走到"能交付的设计源"**。
 
 > 想加新技能：新建文件夹 → 写 `SKILL.md` → 在 README 表格里加一行 → 提 PR / 直接 push。
 
