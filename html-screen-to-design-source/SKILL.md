@@ -47,6 +47,45 @@ design brief  →  agent builds HTML  →  html-screen-to-design-source  →  Fi
     ↑ big-screen-design-brief
 ```
 
+## When this is the right path (FineReport / FVS / BI big screens)
+
+If the goal is a **FineReport FVS / FineVis / data-visualization big screen**, do *not* try to
+author it by describing panels to a tool. Do this instead:
+
+```
+write HTML  →  this skill turns it into a layered SVG design source  →  Lanhu/Figma annotation  →  FVS developer rebuilds
+```
+
+Why: writing HTML is what a general agent does best; HTML renders for real, so it can be
+verified pixel by pixel; and the HTML → SVG → annotation → FVS chain is mechanical from there.
+
+Be explicit with the client about the split of work, or they will expect a runnable FVS file:
+
+| Stage | Owner | Output |
+| --- | --- | --- |
+| Design | agent writes HTML | `index.html` (fixed canvas, static mode) |
+| Slicing / specs | **this skill** | layered SVG + full PNG asset set |
+| Review | Lanhu / Figma | selectable, annotatable design source |
+| Build | FVS / BI developer | panels rebuilt from specs; **charts are rebuilt with native components**, not pasted as images |
+
+That last line matters: charts in the design source are **placeholders** that fix position and
+size only. Real charts are re-created by the developer against live data.
+
+## Input contract (what the upstream skill must hand you)
+
+Accept a screen produced by [`big-screen-design-brief`](../big-screen-design-brief/) and check
+these five things before you start. Missing items are cheaper to fix now than after slicing:
+
+| # | Must exist | If missing |
+| --- | --- | --- |
+| 1 | static mode (`?live=1` re-enables dynamics) | add it — otherwise nothing is measurable |
+| 2 | stable element names (`data-el="card__kpi"`, `-2 -3` for repeats) | add names, or expect unlabelled layers downstream |
+| 3 | layers separated: card chrome / icons / photos / text | re-cut per type; do not flatten |
+| 4 | `assets/` folder + manifest (file → purpose → size → AI-generated?) | rebuild the manifest from the DOM |
+| 5 | full-page preview PNG at canvas size | re-render it as the diff baseline |
+
+---
+
 ## 0. Ground rules
 
 1. **The render is the source of truth.** Never hand-place anything from reading CSS. Measure, place, then verify with a diff.
