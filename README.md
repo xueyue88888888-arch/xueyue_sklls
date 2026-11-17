@@ -35,7 +35,7 @@ These three skills cover the whole path, and every step is verified with numbers
 
 | Skill | What it does | Use it when |
 | --- | --- | --- |
-| **[big-screen-design-brief](big-screen-design-brief/)** | Turns a reference image (or a text brief) into an agent-ready spec: element inventory → four-way classification (**CSS / vector / AI-generated image / data chart**) → brief + image prompts | A designer says "make it look like this" and needs a sliceable HTML screen |
+| **[big-screen-design-brief](big-screen-design-brief/)** | Turns a reference image (or a text brief) into an agent-ready spec: element inventory → four-way classification (**CSS / vector / AI-generated image / data chart**) → brief + image prompts, plus a **visual-quality bar** (glow discipline, type scale, depth, spacing rhythm) | A designer says "make it look like this" and needs a sliceable *and good-looking* screen |
 | **[html-screen-to-design-source](html-screen-to-design-source/)** | Freezes the page, measures the DOM, slices by element type, assembles a layered SVG, verifies it pixel by pixel, audits design-tool compatibility | You have the HTML and need a design source + downloadable slices |
 | **[figma-lanhu-export-marker](figma-lanhu-export-marker/)** | Figma plugin + manifest generator: batch-organize layers and mark **every instance** of every asset for export before uploading to Lanhu | Imports land in Figma, but only a handful of images are downloadable |
 
@@ -119,7 +119,7 @@ coordinates, skipping a mask that would have made Figma drop the background enti
 skills/
 ├── big-screen-design-brief/       # upstream: reference image → brief
 │   ├── SKILL.md
-│   └── references/                # asset classification · AI image prompts
+│   └── references/                # asset classification · AI image prompts · visual quality bar
 ├── html-screen-to-design-source/  # middle: HTML → design source
 │   ├── SKILL.md
 │   ├── scripts/                   # measure · slice · build · verify · compat audit
@@ -138,6 +138,7 @@ skills/
 
 - [x] HTML → design source with pixel verification
 - [x] Reference image → four-way asset classification (CSS / vector / AI image / chart)
+- [x] Visual-quality bar for dark dashboards (single focus, 3-tier luminance, glow limits, type scale)
 - [x] Figma plugin: manifest-driven, marks every instance
 - [ ] Lanhu upload + annotation acceptance checklist
 - [ ] Chart.js / Highcharts adapters for `slice_charts.py`
