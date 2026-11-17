@@ -1,0 +1,9 @@
+{
+  "name": "图层整理与导出标记 v6",
+  "id": "1593081658461765900",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page"
+}

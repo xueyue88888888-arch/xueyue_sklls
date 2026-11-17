@@ -11,6 +11,7 @@
 | --- | --- | --- |
 | [big-screen-design-brief](big-screen-design-brief/) | 给一张参考图 → 拆元素 → 判定「CSS / 矢量 / AI 生成图 / 数据图表」→ 出可切图的大屏 HTML 任务书（含 AI 出图 prompt 模板） | image-gen（C 类素材） |
 | [html-screen-to-design-source](html-screen-to-design-source/) | 把渲染好的 HTML 大屏转成分层、逐像素验收过的 SVG 设计源，可干净导入 Figma / 蓝湖 / MasterGo | playwright + numpy + pillow |
+| [figma-lanhu-export-marker](figma-lanhu-export-marker/) | Figma 插件 + 清单生成器：批量整理图层、给每个素材实例打 Export 标记，再交蓝湖上传 | Figma 桌面版 |
 
 ### 一条链路
 
@@ -20,7 +21,7 @@
 Agent 产出 HTML 原型（固定画布 + 静态模式 + data-el 命名）
    ↓  html-screen-to-design-source（静态化 → 量几何 → 切图 → 合成 SVG → 像素验收 → 工具兼容）
 Figma / 蓝湖设计源（可点选、可标注）
-   ↓
+   ↓  figma-lanhu-export-marker（每个素材实例打 Export → 蓝湖生成下载项）
 开发（帆软 FVS / BI）按标注与切图落地，图表用原生组件重建
 ```
 

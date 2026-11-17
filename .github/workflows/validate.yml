@@ -19,6 +19,13 @@ jobs:
       - name: Validate skill folders
         run: python .github/scripts/validate_skills.py .
 
+      - name: Figma plugin JS syntax
+        run: |
+          files=$(find . -path '*/plugin/*.js' -not -path './.git/*')
+          if [ -z "$files" ]; then echo "no plugin js"; exit 0; fi
+          command -v node >/dev/null || { echo "node missing"; exit 1; }
+          for f in $files; do echo "checking $f"; node --check "$f"; done
+
       - name: Python scripts compile
         run: |
           files=$(find . -name '*.py' -not -path './.git/*')

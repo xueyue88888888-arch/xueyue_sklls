@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 12px; font: 12px/1.6 -apple-system, "Microsoft YaHei", sans-serif;
+    color: #e8eef5; background: #1b1f26; height: 100vh; display: flex; flex-direction: column;
+  }
+  h1 { font-size: 13px; margin: 0 0 6px; font-weight: 600; color: #fff; }
+  .hint { font-size: 11px; color: #8fa3b8; margin-bottom: 8px; line-height: 1.65; }
+  .hint b { color: #9fd0ff; font-weight: 600; }
+  #summary { font-size: 12px; color: #9fd0ff; margin-bottom: 6px; min-height: 18px; }
+  details { margin-bottom: 8px; }
+  summary { cursor: pointer; font-size: 11px; color: #9fd0ff; }
+  textarea {
+    width: 100%; height: 96px; margin-top: 6px; padding: 6px 8px; resize: vertical;
+    background: #12161c; color: #cfe3f5; border: 1px solid #2b323c; border-radius: 4px;
+    font-family: Consolas, monospace; font-size: 11px; line-height: 1.5;
+  }
+  #log {
+    flex: 1; overflow: auto; background: #12161c; border: 1px solid #2b323c;
+    border-radius: 4px; padding: 8px; font-family: Consolas, monospace; font-size: 11px;
+    color: #b9c6d4; white-space: pre-wrap; word-break: break-all;
+  }
+  .row { display: flex; gap: 7px; margin-top: 8px; }
+  button {
+    flex: 1; padding: 8px 0; font-size: 12px; cursor: pointer;
+    color: #fff; background: #0d99ff; border: 0; border-radius: 5px; font-weight: 600;
+  }
+  button.sec { background: #39414c; font-weight: 400; }
+  button.ghost { background: transparent; border: 1px solid #39414c; font-weight: 400; flex: 0 0 60px; }
+  button:hover { filter: brightness(1.15); }
+  .done { color: #6ee7a8; }
+  .fail { color: #ff9b9b; }
+</style>
+</head>
+<body>
+  <h1>图层整理与导出标记 v6</h1>
+  <div class="hint">
+    把设计源 SVG 拖进画布 → <b>确认清单</b> → 诊断 → 预览 → 整理并标记 → 导出 CSV → 蓝湖上传。<br>
+    <b>同一素材的每个实例都会标</b>（<code>card__mini-metric-3</code> 会归一到 <code>card__mini-metric</code>）。<br>
+    素材总板默认 <b>0 标记</b>，避免蓝湖出现两套重复下载项。
+  </div>
+
+  <div id="summary">等待操作…</div>
+
+  <details id="manifest-box">
+    <summary>素材清单（name,PNG  每行一条，留空则用预设）</summary>
+    <textarea id="manifest" spellcheck="false"></textarea>
+  </details>
+
+  <div class="row">
+    <button id="load">载入清单</button>
+    <button id="auto" class="sec">按命名自动推断</button>
+  </div>
+
+  <div id="log">尚未运行。建议顺序：诊断 → 导出预览 → 整理并标记。</div>
+
+  <div class="row">
+    <button id="organize">整理并标记（全部实例）</button>
+    <button id="organize-lib" class="sec">也标素材总板</button>
+  </div>
+  <div class="row">
+    <button id="diagnose" class="sec">诊断</button>
+    <button id="preview" class="sec">导出预览</button>
+    <button id="csv" class="sec">导出结果 CSV</button>
+  </div>
+  <div class="row">
+    <button id="clear" class="sec">清空旧标记</button>
+    <button id="remove" class="sec">移除旧板</button>
+    <button id="close" class="ghost">关闭</button>
+  </div>
+
+<script>
+  const summaryEl = document.getElementById('summary');
+  const logEl = document.getElementById('log');
+  const manifestEl = document.getElementById('manifest');
+  const post = (msg) => parent.postMessage({ pluginMessage: msg }, '*');
+  const busy = (text) => { summaryEl.textContent = text; summaryEl.className = ''; };
+
+  const withManifest = (type, extra) => Object.assign(
+    { type: type, mode: manifestEl.value.trim() ? 'manifest' : 'preset', manifest: manifestEl.value },
+    extra || {}
+  );
+
+  document.getElementById('load').onclick = () => {
+    busy('正在载入清单…');
+    post({ type: 'manifest', mode: manifestEl.value.trim() ? 'manifest' : 'preset', manifest: manifestEl.value });
+  };
+  document.getElementById('auto').onclick = () => {
+    busy('正在按命名推断…');
+    post({ type: 'auto', mode: 'auto', manifest: '' });
+  };
+  document.getElementById('organize').onclick = () => {
+    busy('正在整理并标记…');
+    post(withManifest('organize'));
+  };
+  document.getElementById('organize-lib').onclick = () => {
+    busy('正在标记（含素材总板）…');
+    post(withManifest('organize-lib'));
+  };
+  document.getElementById('diagnose').onclick = () => { busy('正在诊断…'); post(withManifest('diagnose')); };
+  document.getElementById('preview').onclick = () => { busy('正在生成预览…'); post(withManifest('preview')); };
+  document.getElementById('csv').onclick = () => { busy('正在导出结果…'); post(withManifest('csv')); };
+  document.getElementById('clear').onclick = () => { busy('正在清空…'); post(withManifest('clear')); };
+  document.getElementById('remove').onclick = () => { busy('正在移除旧板…'); post(withManifest('remove-legacy')); };
+  document.getElementById('close').onclick = () => post({ type: 'close' });
+
+  post({ type: 'ui-ready' });
+
+  const downloadCsv = (text, filename) => {
+    try {
+      const blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (e) {
+      logEl.textContent = '下载失败，请复制下方文本另存为 .csv：\n' + e.message + '\n\n' + text;
+    }
+  };
+
+  onmessage = (e) => {
+    const msg = e.data.pluginMessage;
+    if (!msg) return;
+    if (msg.type === 'init') {
+      if (msg.preset && !manifestEl.value) manifestEl.value = msg.preset;
+      return;
+    }
+    if (msg.type === 'csv') { downloadCsv(msg.text, msg.filename); return; }
+    if (msg.type !== 'done') return;
+    summaryEl.textContent = msg.summary;
+    summaryEl.className = msg.ok ? 'done' : 'fail';
+    logEl.textContent = (msg.log || []).join('\n') || '（无日志）';
+  };
+</script>
+</body>
+</html>
