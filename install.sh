@@ -19,10 +19,14 @@ for dir in "$ROOT"/*/; do
     alma skill create "$name" --file "$dir/SKILL.md" >/dev/null
     echo "registered $name"
   fi
-  for item in scripts references examples README.md; do
-    [ -e "$dir/$item" ] && cp -R "$dir/$item" "$DEST/$name/"
+  # copy the whole skill (minus VCS / build cruft) so any layout works:
+  # scripts/, bin/, rules/, templates/, cases/, assets/ ... all come along.
+  for item in "$dir"* "$dir".[!.]*; do
+    [ -e "$item" ] || continue
+    base="$(basename "$item")"
+    case "$base" in .git|.github|node_modules|__pycache__|.venv) continue;; esac
+    cp -R "$item" "$DEST/$name/"
   done
-  cp "$dir/SKILL.md" "$DEST/$name/SKILL.md"
   echo "synced     $name -> $DEST/$name"
 done
 

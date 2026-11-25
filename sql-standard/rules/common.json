@@ -1,0 +1,159 @@
+{
+  "name": "sql-standard",
+  "version": "0.1.0",
+  "rules": [
+    {
+      "id": "S01",
+      "level": "P0",
+      "title": "代码区出现全角标点",
+      "type": "regex",
+      "pattern": "[，；：（）［］｛｝]",
+      "fix": "改成半角 , ; : ( )",
+      "why": "全角标点会让 SQL 直接语法错误或让字面量匹配不到"
+    },
+    {
+      "id": "S02",
+      "level": "P0",
+      "title": "字符串里含零宽字符或弯引号",
+      "type": "custom",
+      "check": "invisible_chars",
+      "fix": "删掉零宽字符，弯引号改直引号",
+      "why": "哨兵值写成 '__ALL__' 这类含隐藏字符时等于没过滤，且肉眼看不出来"
+    },
+    {
+      "id": "S03",
+      "level": "P0",
+      "title": "除法没有 NULLIF 保护",
+      "type": "custom",
+      "check": "division_guard",
+      "fix": "分母包一层 NULLIF(分母, 0)",
+      "why": "分母为 0 会报错或返回 NULL，占比类指标直接显示空白"
+    },
+    {
+      "id": "S04",
+      "level": "P0",
+      "title": "NOT IN 子查询可能踩 NULL",
+      "type": "regex",
+      "pattern": "(?i)not\\s+in\\s*\\(\\s*select",
+      "fix": "改 NOT EXISTS，或子查询里 WHERE 列 IS NOT NULL",
+      "why": "子查询返回任何 NULL 时整个 NOT IN 结果为空，不报错但少数据"
+    },
+    {
+      "id": "S11",
+      "level": "P1",
+      "title": "SELECT *",
+      "type": "regex",
+      "pattern": "(?i)select\\s+(distinct\\s+)?\\*",
+      "fix": "显式列出需要的列",
+      "why": "上游加列会让下游错位，且无法做列裁剪"
+    },
+    {
+      "id": "S12",
+      "level": "P1",
+      "title": "缺交付头注释（用途/口径/对账）",
+      "type": "custom",
+      "check": "header_block",
+      "fix": "按 references/delivery.md 补头注释",
+      "why": "没有口径的 SQL 三个月后没人敢改，也没法验收"
+    },
+    {
+      "id": "S13",
+      "level": "P1",
+      "title": "单字母或无意义表别名",
+      "type": "custom",
+      "fix": "表别名写成能读懂的 3-8 字符，如 emp / cert / plan",
+      "why": "a.x = b.y 这种写法没人能评审",
+      "check": "table_alias"
+    },
+    {
+      "id": "S14",
+      "level": "P1",
+      "title": "制表符缩进",
+      "type": "regex",
+      "pattern": "\\t",
+      "fix": "改为 4 个空格",
+      "why": "tab 在不同工具里宽度不同，对齐会乱"
+    },
+    {
+      "id": "S15",
+      "level": "P1",
+      "title": "单行超过 120 字符",
+      "type": "custom",
+      "check": "long_lines",
+      "fix": "按子句换行",
+      "why": "横向滚动是代码评审的第一杀手"
+    },
+    {
+      "id": "S16",
+      "level": "P1",
+      "title": "关键字大小写混用",
+      "type": "custom",
+      "check": "keyword_case",
+      "fix": "统一大写关键字（select → SELECT）",
+      "why": "混用会让读者分不清关键字和字段名"
+    },
+    {
+      "id": "S17",
+      "level": "P1",
+      "title": "硬编码完整日期",
+      "type": "custom",
+      "fix": "改成参数，或至少提取成一个 CTE 常量",
+      "why": "写死的日期明年就错，而且没人会记得改",
+      "check": "hardcoded_date"
+    },
+    {
+      "id": "S18",
+      "level": "P1",
+      "title": "GROUP BY / ORDER BY 用列序号",
+      "type": "regex",
+      "pattern": "(?i)(?:group\\s+by|order\\s+by)\\s+\\d+(\\s*,\\s*\\d+)*",
+      "fix": "写列名或别名",
+      "why": "调换列顺序就静默算错，且改不动"
+    },
+    {
+      "id": "S19",
+      "level": "P1",
+      "title": "逗号隐式连表",
+      "type": "regex",
+      "pattern": "(?i)from\\s+[\\w.]+(\\s+(as\\s+)?\\w+)?\\s*,\\s*[\\w.]+(\\s+(as\\s+)?\\w+)?\\s*(where|,)",
+      "fix": "改显式 JOIN ... ON",
+      "why": "隐式连接漏写关联条件就是笛卡尔积，行数悄悄翻几倍"
+    },
+    {
+      "id": "S21",
+      "level": "P2",
+      "title": "查数仓表缺日期/分区条件",
+      "type": "custom",
+      "check": "partition_filter",
+      "fix": "加上 data_dt / pt 条件",
+      "why": "无分区条件会全表扫描，查一次几十秒甚至拖垮库"
+    },
+    {
+      "id": "S22",
+      "level": "P2",
+      "title": "窗口函数取最新但排序键单薄",
+      "type": "custom",
+      "check": "window_order",
+      "fix": "ORDER BY 至少带两个键（时间 + 序号或主键）",
+      "why": "只按一个键排序时，同时间多条记录取到哪条不确定"
+    },
+    {
+      "id": "S23",
+      "level": "P2",
+      "title": "用了 DISTINCT 掩盖重复",
+      "type": "regex",
+      "pattern": "(?i)select\\s+distinct",
+      "fix": "先确认重复的成因（JOIN 基数 / 历史切片），再用 ROW_NUMBER 精确去重",
+      "why": "DISTINCT 会把真实重复和 JOIN 放大一起抹掉，指标悄悄偏小"
+    },
+    {
+      "id": "S24",
+      "level": "P2",
+      "title": "字符串与数字直接比较",
+      "type": "regex",
+      "pattern": "(?i)\\b\\w*(code|no|id|num)\\w*\\s*=\\s*\\d{3,}",
+      "fix": "确认字段类型，必要时显式 CAST",
+      "why": "隐式转换在部分方言里会失效索引，也可能把前导零吃掉"
+    }
+  ]
+}

@@ -28,13 +28,13 @@ foreach ($s in $skills) {
         # let Alma register the skill (writes SKILL.md + records it)
         & alma skill create $s.Name --file (Join-Path $s.FullName 'SKILL.md') | Out-Null
     }
-    foreach ($item in @('scripts', 'references', 'examples', 'README.md')) {
-        $src = Join-Path $s.FullName $item
-        if (-not (Test-Path -LiteralPath $src)) { continue }
-        Copy-Item -LiteralPath $src -Destination $target -Recurse -Force
+    # copy the whole skill (minus VCS / build cruft) so any layout works:
+    # scripts/, bin/, rules/, templates/, cases/, assets/ ... all come along.
+    $skip = @('.git', '.github', 'node_modules', '__pycache__', '.venv')
+    foreach ($item in Get-ChildItem -LiteralPath $s.FullName -Force) {
+        if ($item.Name -in $skip) { continue }
+        Copy-Item -LiteralPath $item.FullName -Destination $target -Recurse -Force
     }
-    # keep SKILL.md in sync as well
-    Copy-Item -LiteralPath (Join-Path $s.FullName 'SKILL.md') -Destination $target -Force
     Write-Host ("{0} {1} -> {2}" -f ($(if ($first) { 'registered' } else { 'synced    ' })), $s.Name, $target)
 }
 

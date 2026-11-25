@@ -3,7 +3,7 @@
 **Turn a rendered HTML screen into a layered, pixel-verified SVG design source — for Figma, Lanhu (蓝湖), MasterGo, or any hand-off tool.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Skills](https://img.shields.io/badge/skills-3-brightgreen.svg)](#skills)
+[![Skills](https://img.shields.io/badge/skills-4-brightgreen.svg)](#skills)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](../../issues)
 
 Designers can't receive a screenshot. Developers can't build from a picture.
@@ -38,6 +38,7 @@ These three skills cover the whole path, and every step is verified with numbers
 | **[big-screen-design-brief](big-screen-design-brief/)** | Turns a reference image (or a text brief) into an agent-ready spec: element inventory → four-way classification (**CSS / vector / AI-generated image / data chart**) → brief + image prompts, plus a **visual-quality bar** (glow discipline, type scale, depth, spacing rhythm) | A designer says "make it look like this" and needs a sliceable *and good-looking* screen |
 | **[html-screen-to-design-source](html-screen-to-design-source/)** | Freezes the page, measures the DOM, slices by element type, assembles a layered SVG, verifies it pixel by pixel, audits design-tool compatibility | You have the HTML and need a design source + downloadable slices |
 | **[figma-lanhu-export-marker](figma-lanhu-export-marker/)** | Figma plugin + manifest generator: batch-organize layers and mark **every instance** of every asset for export before uploading to Lanhu | Imports land in Figma, but only a handful of images are downloadable |
+| **[sql-standard](sql-standard/)** | Data-governance-grade SQL standard plus a zero-dependency gate: 17 database-agnostic rules plus a Doris dialect profile (21 in total), a delivery contract (purpose / caliber / reconciliation) and three templates (KPI · drill-down · latest-record). 22 regression cases keep every rule honest. Blocks the errors that return wrong numbers without erroring | Any SQL is about to ship — report datasets, drill-downs, batch jobs, ad-hoc queries. Exit code doubles as a commit hook |
 
 ```mermaid
 flowchart LR

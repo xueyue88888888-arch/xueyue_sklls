@@ -1,0 +1,41 @@
+{
+  "name": "doris",
+  "rules": [
+    {
+      "id": "D01",
+      "level": "P0",
+      "title": "GROUP_CONCAT 写了 SEPARATOR（Doris 不支持）",
+      "type": "regex",
+      "pattern": "(?i)group_concat\\s*\\([^)]*separator",
+      "fix": "去掉 SEPARATOR，用 GROUP_CONCAT(x) 默认逗号；要别的分隔符用 array_join(collect_list(x), '|')",
+      "why": "Doris 解析器直接报 mismatched input 'SEPARATOR'"
+    },
+    {
+      "id": "D02",
+      "level": "P1",
+      "title": "LIMIT 用逗号写法",
+      "type": "regex",
+      "pattern": "(?i)limit\\s+\\d+\\s*,\\s*\\d+",
+      "fix": "改 LIMIT n OFFSET m",
+      "why": "逗号写法在部分版本语义相反，翻页会错位"
+    },
+    {
+      "id": "D03",
+      "level": "P1",
+      "title": "用 ISNULL(x) 当谓词",
+      "type": "regex",
+      "pattern": "(?i)where[^\\n]*\\bisnull\\s*\\(",
+      "fix": "改 x IS NULL",
+      "why": "ISNULL 在 Doris/MySQL 里含义不一致，容易判反"
+    },
+    {
+      "id": "D04",
+      "level": "P2",
+      "title": "对分区字段套函数",
+      "type": "regex",
+      "pattern": "(?i)(date_format|substr|cast)\\s*\\(\\s*(?:\\w+\\.)?(data_dt|pt)\\b",
+      "fix": "改成对区间做范围比较，如 data_dt = '2026-11-24' 或 between",
+      "why": "分区字段套函数会失去分区裁剪，退化成全表扫描"
+    }
+  ]
+}
