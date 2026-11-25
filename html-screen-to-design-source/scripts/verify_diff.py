@@ -75,9 +75,19 @@ def main():
         print('size mismatch: %s vs %s' % (a.shape, b.shape))
         sys.exit(2)
 
+    diff_failed = False
     delta = np.abs(a - b).max(axis=2)
     strong = delta > args.threshold
     print('overall   mean %.2f  strong %.2f%%' % (delta.mean(), 100 * strong.mean()))
+
+    def ink(img, mask):
+        # Pixels that stand out from the local background: a run of text is ink even
+        # when the overall diff stays low. Without this, losing every glyph still
+        # measured 2.24% "strong" and passed the 2.5% bar.
+        flat = img.reshape(-1, 3).astype(np.float32)
+        bg = np.median(flat, axis=0)
+        dev = np.abs(img.astype(np.float32) - bg).max(axis=2)
+        return int(((dev > 70) & mask).sum())
 
     if args.text:
         nodes = json.loads(open(args.text, encoding='utf-8').read())
@@ -87,10 +97,19 @@ def main():
             100 * tm.mean(), delta[tm].mean(), 100 * strong[tm].mean()))
         print('non-text    %5.1f%% of canvas   mean %5.2f  strong %5.2f%%' % (
             100 * (~tm).mean(), delta[~tm].mean(), 100 * strong[~tm].mean()))
+        ink_a, ink_b = ink(a, tm), ink(b, tm)
+        ratio = (ink_b / ink_a) if ink_a else 1.0
+        print('text ink    baseline %d px   candidate %d px   ratio %.2f' % (ink_a, ink_b, ratio))
+        if ratio < 0.6:
+            print('WARN text ink dropped %.0f%%: glyphs are missing or covered, the pixel diff alone hides it'
+                  % (100 * (1 - ratio)))
+            diff_failed = True
 
     print('\nworst regions (x1,y1,x2,y2  strong px):')
     for w_, x1, y1, x2, y2 in clusters(delta, threshold=args.threshold)[:args.top]:
         print('  (%4d,%4d,%4d,%4d)  %5d   %dx%d' % (x1, y1, x2, y2, w_, x2 - x1, y2 - y1))
+    if diff_failed:
+        sys.exit(3)
 
 
 if __name__ == '__main__':

@@ -11,6 +11,12 @@ allowed-tools:
 
 # 大屏设计任务书（参考图 → 元素分类 → HTML）
 
+> **模型要求**：本技能的输入是一张参考图。执行它的模型必须**多模态**——能看图，
+> 并能读出图里的文字（OCR）和配色、间距。纯文本模型会照着描述编布局、编文案，
+> 产出看着完整但和原图对不上；这类任务不要派给纯文本模型。
+
+
+
 ## 谁用、解决什么
 
 **设计师拿着一张参考图**（竞品截图、mood board、自己画的效果图）说"我要做成这样"。
@@ -139,7 +145,49 @@ allowed-tools:
 | 色彩 | 主色 + 强调色 + 语义色，色相 ≤ 4，强调色面积 ≤ 10%；正文对比 ≥ 4.5:1 |
 | 动效 | 全屏 ≤ 3 处，周期 2–4s；关掉动效信息仍完整 |
 
-交付前用末尾那张 **10 项自评表**打分（每项 0–2，≥16 才交）。
+交付前用末尾那张 10 项自评表打分（每项 0–2，≥16）——但自评只是辅助，
+**真正的交付硬线是第 3.6 步的客观还原校验**：截图与参考图配准后的得分不达标，自评再高也不交。
+
+---
+
+## 第 3.6 步：客观还原校验（有参考图时必做，硬性门槛）
+
+有参考图的任务，HTML 写完必须先渲染截图，再跟参考图做配准对比。**不许靠"看起来像"或自评打分判断还原度**——
+主观自评正是漏掉布局偏差的元凶（深蓝科技风两张图乍看很像，实测结构差 60%）。
+
+```bash
+python scripts/verify_reference_match.py \
+  --reference <参考图路径> --render <HTML截图路径> \
+  --out <报告.json> --threshold 0.70
+```
+
+- 脚本独立处理尺寸/比例差异，统一缩放后算灰度 SSIM + 边缘 SSIM 的综合分；
+- 同时输出 9 个分区得分和最差 3 区，直接指出哪块画歪了；
+- **得分 < 0.70 就退回改布局，改完重测**，直到达标才进入下游切图。
+
+迭代顺序：先看最差 3 区 → 回参考图按 8×6 网格核对该区元素的 x/y/w/h 和样式 → 改 CSS → 重渲染 → 重测。
+边缘分偏低通常是布局/轮廓错位（模块位置、大小、仪表盘/环图形状），灰度分偏低通常是明暗或配色。
+
+---
+
+---
+
+## 第 3.7 步：端到端 FVS 还原校验（目标 ≥0.90，硬门槛）
+
+第 3.6 步校验的是「HTML 还原稿 vs 参考图」。真正交付给用户的是 FVS，所以还要校验「帆软实机渲染 vs 参考图」，目标 **≥0.90**。
+
+实测基线（2026-11-24，帆软 8075 实机 + 9 分区 SSIM）：
+- **纯切图 + text 文字模式：0.927**（文字/数字全可编辑，图表切图）——这是保底可达的标准
+- 原生图表 + 自动擦除底图：0.918（3 图）~0.851（6 图样式未调），图表可编辑但依赖上游 SVG 质量
+- 旧默认 table 模式只有 0.871（KPI 大字被折叠进表格塌成 0/5）——**文字承载必须用 text 模式**
+
+做法：
+1. `node tools/svg-to-fvs.cjs <svg> <名字> 1920 1080`（默认已是 text 模式）
+2. FVS 拷进帆软 reportlets 目录，`node tools/fvs-shot-named.cjs <viewlet> <png>` 实机截图
+3. `verify_reference_match.py --reference <参考图> --render <实机截图> --threshold 0.90`
+4. 得分 < 0.90 看最差 3 区：若是帆软未注册水印挡住的区域，可用遮罩复算；若是真布局/字体差，回 HTML 改
+
+**注意**：帆软未注册版会在右下角盖一块水印，会拉低该区分 0.10+。这是授权问题不是转换 bug，扣水印后真实差异通常 <3%。
 
 ---
 
@@ -180,7 +228,27 @@ allowed-tools:
 | 02 | LOGO / 书法 | B | — | 官方原件，不许重绘 |
 
 六、工程要求（决定后面能不能切图）
-见下节「7 条硬约束」，一条都不能省。
+见下节「7 条硬约束」和紧随其后的「命名契约（双写）」，一条都不能省。
+
+六·补、命名契约（双写，必须写进 HTML）
+每个可视块同时写 data-el 和 data-name（也可以只用 data-name，由脚本自动推导 data-el），按下表选词：
+| 设计元素 | data-el | data-name 前缀 |
+| 页面/面板底 | page-bg / panelbg__* | page-bg__ |
+| 标题栏 | titlebar | panel-header__（标题文字）；栏底用 title-bar-bg__ |
+| KPI 卡 | card__kpi | panel-header__（KPI文字）或 title-bar-bg__（卡底） |
+| 筛选框 | filter / filter-item | filter-bar__ / filter-bar-bg__ |
+| 查询按钮 | query / btn-query | filter-bar__（含"查询"文字） |
+| 表格 | table | table-header__ / table-rows__ / table-bg__ |
+| 图表容器 | chart / chart__<type> | chartref__（容器内内嵌 data-chart-option，见下「图表可编辑三条件」） |
+重复件加 -2 -3 或 __序号；同一节点上两个属性语义必须一致。
+为什么：下游 svg2fvs 只读 data-name 的 8 类白名单前缀（page-bg / title-bar-bg / filter-bar-bg / table-bg / panel-header / filter-bar / table-header / table-rows）；只写 data-el 它看不到，只能靠几何猜，命中率下降。
+
+### 图表可编辑三条件（想"图表能改数据"必做，否则只能切图）
+1. **图表容器坐标必须对**：用 flex/grid 正常文档流，不要写死 `position:absolute; left:10px; top:36px`（父容器一塌，getBoundingClientRect 会给出错坐标，图表全堆左上角）。
+2. **图表数据必须内嵌**：容器上加 `data-chart-option="<base64(ECharts option)>"`，option 要带完整样式（颜色、渐变、min/max、legend、splitLine），否则原生图表能用但跟原图不像。用 `inject_chart_options.py` 注入。
+3. **page-bg 不能烘煊图表形状**：底图只能有背景/面板/装饰，图表区要留空；如果底图已把图表画进去了，svg2fvs 会自动擦除图表区(eraseRects)但样式可能需要重调。
+
+如果上游做不到 2（图表是 CSS/SVG 手绘而非真 ECharts），那就只能切图（图表不可编辑）。想全可编辑，图表必须用真 ECharts。
 
 七、交付
 index.html + css/ + js/ + assets/；附 2752×1204 整页预览 PNG
@@ -237,12 +305,13 @@ Prompt 模板库、一致性与抠图清单见 `references/ai-image-prompts.md`�
 ## 第 7 步：验收
 
 设计侧：
+- [ ] **客观还原校验通过**：`verify_reference_match.py` 得分 ≥ 0.70（有参考图时；不达标不算完成）
 - [ ] 单屏不滚动，缩放不变形
 - [ ] 模块层次清楚：标题区 / 指标区 / 图表区不打架
 - [ ] 数值和单位字号不同级；同类卡片间距、字号、颜色完全一致
 - [ ] 缩到 30% 还能看清结构；发光不糊
 
-设计质量自评（每项 0–2 分，≥16 才交付，判据见 `references/visual-quality.md`）：
+设计质量自评（每项 0–2 分，≥16）——辅助参考，不能替代上面的客观校验：
 单一焦点 / 三层明度 / 发光纪律 / 字号阶梯 / 间距节奏 / 色彩克制 / 图表统一 / 照片不抢戏 / 动效克制 / 缩略可读。
 
 工程侧（决定能不能切图）：
@@ -252,6 +321,7 @@ Prompt 模板库、一致性与抠图清单见 `references/ai-image-prompts.md`�
 - [ ] 无 `background-clip:text` / `backdrop-filter` / `mask`
 - [ ] 有静态模式，连渲染两次截图一致
 - [ ] 元件都有 `data-el` 命名
+- [ ] 每个可视块同时有 `data-name`（白名单前缀见第 4 步「命名契约（双写）」）
 
 ---
 
@@ -277,7 +347,7 @@ Prompt 模板库、一致性与抠图清单见 `references/ai-image-prompts.md`�
 | --- | --- | --- |
 | 1 | `index.html` + `css/` + `js/` + `assets/` | 双击可开，不依赖构建 |
 | 2 | **静态模式开关** | `?live=1` 恢复动态；默认静态、无定时刷新、无随机数据 |
-| 3 | **元件稳定命名** | `data-el="panel__pasture"`、`data-el="card__kpi"`、重复件 `-2 -3` 递增 |
+| 3 | **元件稳定命名（双写）** | 每个可视块同时写 `data-el` 和 `data-name`；`data-el="card__kpi"` / `data-name="panel-header__kpi-1"`；重复件 `-2 -3` 递增 |
 | 4 | **分层结构** | 卡底 / 图标 / 照片 / 文字各自独立节点 |
 | 5 | **素材清单** | `assets/README.md` 或 `manifest.csv`：文件名 → 用途 → 显示尺寸 → 是否 AI 生成 → prompt 摘要 |
 | 6 | **整页预览 PNG** | 画布原尺寸，用于和设计源做像素对照 |
@@ -290,7 +360,7 @@ Prompt 模板库、一致性与抠图清单见 `references/ai-image-prompts.md`�
 
 ## 第 10 步：HTML 定稿后
 
-逐条确认上面 6 项都在（静态模式、`data-el` 命名、分层、素材清单、预览图），
+逐条确认上面 6 项都在（静态模式、双写命名、分层、素材清单、预览图），
 再按交接口令交给下游。那句"素材在 `<path>`"指的就是第 5 步生成并归档的 C 类图片与 B 类矢量原件。
 
 ---
@@ -305,7 +375,12 @@ Prompt 模板库、一致性与抠图清单见 `references/ai-image-prompts.md`�
 | 农业/食品 | 牧场、产量、品质 | 实景航拍 | 牧场、奶牛、挤奶线 |
 | 政务/园区 | 人口、事件、告警 | 园区 3D / 平面图 | 园区鸟瞰（或纯 CSS 示意图） |
 
+## 脚本与依赖
+
+- `scripts/verify_reference_match.py` — 参考图 vs HTML 截图的客观还原校验（灰度+边缘 SSIM，9 分区，达标线 0.70）。有参考图时必跑，不达标不交付。依赖：`pip install scikit-image pillow numpy`。
+
 ---
+
 
 ## 一句话开工
 

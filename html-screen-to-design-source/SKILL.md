@@ -21,6 +21,11 @@ The output is one SVG that:
 
 ---
 
+> **Model requirement (image entry)**: the image path in this skill takes a screenshot as
+> input. The model running it must be **multimodal — it has to see the picture and read the
+> text in it (OCR)**. A text-only model will invent copy, colours and coordinates without
+> telling you. The HTML entry is mechanical and has no such requirement.
+
 ## Who this is for
 
 **Designers and design engineers who have an HTML screen and need real deliverables out of it.**
@@ -79,10 +84,26 @@ these five things before you start. Missing items are cheaper to fix now than af
 | # | Must exist | If missing |
 | --- | --- | --- |
 | 1 | static mode (`?live=1` re-enables dynamics) | add it — otherwise nothing is measurable |
-| 2 | stable element names (`data-el="card__kpi"`, `-2 -3` for repeats) | add names, or expect unlabelled layers downstream |
+| 2 | **dual naming: both `data-el` and `data-name`** on every visual block (or one attribute from which the other is derived) | add it — downstream `svg2fvs` reads ONLY `data-name` whitelist prefixes; with `data-el` alone it falls back to geometry guessing and hit-rate drops |
 | 3 | layers separated: card chrome / icons / photos / text | re-cut per type; do not flatten |
 | 4 | `assets/` folder + manifest (file → purpose → size → AI-generated?) | rebuild the manifest from the DOM |
 | 5 | full-page preview PNG at canvas size | re-render it as the diff baseline |
+
+Naming vocabulary (write it into the HTML, not just the brief; 中文理由见下):
+
+| 设计元素 | data-el | data-name 前缀 |
+| --- | --- | --- |
+| 页面/面板底 | `page-bg` / `panelbg__*` | `page-bg__` |
+| 标题栏 | `titlebar` | `panel-header__`（标题文字）；栏底用 `title-bar-bg__` |
+| KPI 卡 | `card__kpi` | `panel-header__`（KPI 文字）或 `title-bar-bg__`（卡底） |
+| 筛选框 | `filter` / `filter-item` | `filter-bar__` / `filter-bar-bg__` |
+| 查询按钮 | `query` / `btn-query` | `filter-bar__`（含“查询”文字） |
+| 表格 | `table` | `table-header__` / `table-rows__` / `table-bg__` |
+| 图表容器 | `chart` / `chart__<type>` | （图表由 chartsFrom 采集，SVG 里留位置） |
+
+Repeats get `-2 -3` / `__NNN` suffixes; both attributes on the same node must agree semantically.
+
+**为什么**：下游 `svg2fvs` 只读 `data-name` 的 8 类白名单前缀（page-bg / title-bar-bg / filter-bar-bg / table-bg / panel-header / filter-bar / table-header / table-rows）；不写 `data-name` 就靠几何猜，命中率下降。
 
 ---
 
@@ -112,6 +133,17 @@ Disable while `STATIC_MODE`:
 - clock-derived text → replace with fixed constant strings
 
 **Acceptance:** render twice, hash both screenshots. Allowed delta ≈ 0.05% pixels (sub-pixel leftovers). Anything bigger means something still moves — find it before continuing.
+
+---
+
+### 2.0 Preflight: check the HTML before slicing
+
+Before measuring, run the input-contract check. If it fails, fix the HTML first — slicing a non-conformant screen wastes the whole pipeline:
+
+```bash
+python scripts/preflight_html.py --html <index.html> --charts-dir <html目录>
+```
+It checks static-mode, dual naming, semantic prefixes, real text nodes, banned CSS (`mask` / `backdrop-filter` / `background-clip:text`), fixed canvas, and local JS assets. Exit 1 = must fix before continuing.
 
 ---
 
@@ -159,6 +191,41 @@ Build from a clean base in **one idempotent script** (`scripts/build_svg.py` is 
 - put repeated images in `<defs>` once and reference with `<use>` **only while iterating** — expand before delivery
 - write **one** href per image (`href`, not `href` + `xlink:href`; duplicating the base64 doubles file size)
 - name every layer; ids must be unique
+
+### 4.1 When the upstream SVG has no `data-name`
+
+Some agents skip the DOM path and emit an inline `<svg>` directly — all `<text>` and
+`<rect>` are piled into one `<g>` with no layer names. Downstream SVG→FVS then has to guess which
+runs are a table header, which are data rows, and which rects are row backgrounds;
+guessing wrong shows up as vertical headers, wrapped cells and missing backgrounds.
+
+Before assembling, run the semantic layerer:
+
+```bash
+python scripts/label_svg_semantics.py --in <agent-output.html> --out work/labeled.svg
+```
+
+It adds `data-name` groups (`page-bg`, `panel-header`, `filter-bar`, `table-header`,
+`table-rows`, `table-bg`) by spatial clustering — geometry, colours and text are untouched.
+See `references/semantic-layering.md` for the rules and the measured validation. **When the
+deliverable is going to FVS, this step is not optional.**
+### 4.2 Embed chart data so the SVG converts to editable native charts
+
+A design source with `chartref__*` placeholders converts to FVS with **blank or image-slice charts** — the SVG itself carries no chart data. To make an uploaded SVG produce charts whose data can be edited in FineReport, embed each chart's ECharts option into the SVG:
+
+```bash
+python scripts/inject_chart_options.py --svg <design.svg> \
+  --options <chart-options.json> --out <design-with-data.svg>
+```
+
+Export `chart-options.json` from the rendered HTML (each ECharts instance's `getOption()`, functions stripped, keyed by chart id; the freeze script does this). The injector writes each option as base64 into `data-chart-option="..."` on the matching `chartref__*` image. `svg2fvs` reads it and calls `fvs.nativeChart` → native chart with a real dataset. Verified: 8 injected options → 8 native charts, 0 blank.
+
+**This is the key to the user promise**: one SVG, uploaded to the service, becomes an FVS with editable charts. Without it, 'data editable' is impossible from SVG alone. Full gap analysis: `references/pipeline-gaps-and-guide.md`.
+
+The collector ships with this skill (`scripts/export_chart_options.py`; needs only Playwright, which the pipeline already requires). It keys options by the chart element's `data-name` (else `id`), and the injector matches exact name → substring → normalized → document order, so one option per `chartref__*` placeholder is enough. Injection prints `注入图表 option: N/M`; anything unmatched becomes a blank chart in FVS.
+
+---
+
 
 ---
 
@@ -225,8 +292,80 @@ Deliver, next to the SVG:
 ## Reference material
 
 - `references/pitfalls.md` — ranked by cost paid, with the symptom each one caused
+- `references/design-source-layer-spec.md` — **目标图层规范**（模块→6子层、背景图/图表占位/真实文字分离）。做设计源前先读，产出的 SVG 必须符合这个结构才能上传蓝湖做规范切图。标杆样本见文档内的会员大屏 SVG 结构图。
 - `references/compat-matrix.md` — design-tool support matrix and workarounds
-- `scripts/` — runnable starting points: `measure_dom.py`, `slice_cards.py`, `slice_charts.py`, `build_svg.py`, `verify_diff.py`, `figma_compat.py`, `asset_index.py`
+- `scripts/` — runnable starting points: `measure_dom.py`, `slice_cards.py`, `slice_charts.py`, `build_svg.py`, `verify_diff.py`, `figma_compat.py`, `asset_index.py`, `detect_layout.py`, `build_layers_from_image.py`, `structure_layers.py`
+
+## Quick start: one-command pipeline（推荐入口）
+
+Don't assemble the low-level scripts by hand. Give it a conformant HTML and let the orchestrator run the whole chain (preflight → measure → auto jobs → slice → auto config → assemble → semantic layers → chart-data injection → figma check):
+
+```bash
+python scripts/html_to_design_svg.py --html <index.html> --out <out-dir> \
+  --width 1920 --height 1080 --charts-dir <html目录> [--dry-run]
+```
+
+> **`--charts-dir` 必传（有图表时）**：不传它流水线不会导出图表数据，产出的 SVG 图表只有占位图、无 `data-chart-option`，转成 FVS 后图表不可编辑（只能切图）。只有纯文字无图表的大屏才可以省。这是实测踩过的坑。
+
+- It writes `design-layered.svg` (images embedded as base64, real `<text>`, semantic `data-name`, chart data injected if ECharts is present) + `图层清单.md` + `校验结果.txt`.
+- Idempotent: re-run after any HTML change; never hand-patch the output.
+- `--dry-run` prints the generated jobs/config without slicing — use it to inspect before a real run.
+- The resulting SVG uploads cleanly to 蓝湖 and converts via our service into an FVS with editable charts (see 4.2).
+- Still read §2.0 preflight first: a bad HTML produces a bad SVG no matter how good the pipeline is.
+
+**Browser**: you do *not* need `playwright install` when Chrome/Edge is installed. The script looks for a Chromium in this order: `--browser` → `HTML2DESIGN_BROWSER` / `H2F_BROWSER` → a sibling project's `browser.cjs` → the Playwright cache → Chrome/Edge. If it still reports *Executable doesn't exist*, pass `--browser` explicitly.
+
+**Two failure modes the orchestrator refuses to hide**:
+
+| Symptom | What it means | What to do |
+| --- | --- | --- |
+| exits 3, `the SVG has 0 images` | the HTML has no `data-name`/`data-el`, or names miss the whitelist prefixes | run `preflight_html.py`, then name blocks `page-bg__* / panel-header__* / title-bar-bg__* / chartref__*` … |
+| `no chartref image in SVG — nothing to inject` | charts were measured but no container is named `chartref__*` | name chart wrappers `data-name="chartref__<name>"`; options are still saved to `_work/chart-options.json` |
+
+**Layer structure**: `--layer-structure module` (default) regroups the flat output into the handoff structure — `页面底色` + `section-header / section-content / section-table`, each with `module-background / card-backgrounds / photos / charts / icons / text` sublayers. Element `data-name`s are untouched, so the converter sees exactly the same file (measured: pixel diff 0.000, same image/text/chart counts). `--layer-structure flat` opts out.
+
+**Filters are not guessed**: `--filters auto` (default) checks the HTML for `<select>`/`<input>`. When there is none, no text is marked `filter-bar`, so a card dashboard does not turn into a screen full of invented dropdowns. Force it with `--filters yes|no` when the detection is wrong for your page.
+
+The manual steps below (§1–§7) are the building blocks the orchestrator wraps; use them only when you need fine control.
+
+---
+
+## Image entry: a flat reference screenshot → layered SVG
+
+**Before you start**: the model driving this step must have vision + OCR. Step 2 (the
+strings for the measured boxes) is a reading task — a model that cannot read glyphs will
+fill in plausible-looking nonsense, and nothing downstream can detect it.
+
+
+When there is no HTML, only a picture, do **not** let the agent redraw the screen from
+scratch — measured 0.49 SSIM that way. Measure first, then fill:
+
+```bash
+# 1) what the picture objectively contains: canvas, background, palette, every text box
+python scripts/detect_layout.py --image ref.png --width 1920 --height 1080 --json layout.json
+
+# 2) a vision pass fills in the strings for those boxes (and optional chart rects + options)
+#    text.json  : [{"x":18,"y":18,"w":192,"h":18,"text":"…","name":"filter-bar__hint","fontSize":14,"color":"#8FA6C4"}]
+#    charts.json: [{"x":48,"y":400,"w":572,"h":290,"name":"chartref__bar","option":{…}}]
+
+# 3) inpaint the glyphs out and emit the layers
+python scripts/build_layers_from_image.py --image ref.png --layout layout.json   --text text.json [--charts charts.json] --out design/
+```
+
+What it does and does not do:
+
+| Step | Reality |
+| --- | --- |
+| text boxes | reliable — glyphs are the only high-contrast structure (215 boxes on a 1920×1080 dashboard) |
+| strings | **not** OCR — a vision pass must read them; the script never guesses copy |
+| panel/grid detection | **not attempted** — a dark dashboard keeps its cards 3-5 RGB levels above the page, so contours merge or shatter |
+| de-duplication | container runs are replaced by their leaf runs when the copy adds up, otherwise the leaves are dropped; this is what stops double-printed labels |
+| output | base image layer + real `<text>` + `chartref__*` placeholders with `data-chart-option` |
+
+Measured on a 1920×1080 reference: 188 text runs, 21 chart placeholders, SVG → service
+produced **charts 21 / chartBlank 0 / texts 188**, pixel diff vs the reference
+**2.09% strong** (mean 3.91). The copy for that test came from the source DOM; with a
+picture alone the strings come from the vision pass and can carry OCR-level typos.
 
 ## One-line usage
 

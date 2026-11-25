@@ -72,7 +72,18 @@ def add_glow(defs, fid, blur, colour, opacity):
 
 
 def data_uri(path):
-    return 'data:image/png;base64,' + base64.b64encode(Path(path).read_bytes()).decode('ascii')
+    from io import BytesIO
+    from PIL import Image
+    raw = Path(path).read_bytes()
+    try:
+        im = Image.open(BytesIO(raw))
+        if im.mode != 'RGBA':
+            buf = BytesIO()
+            im.convert('RGBA').save(buf, format='PNG')
+            raw = buf.getvalue()
+    except Exception:
+        pass
+    return 'data:image/png;base64,' + base64.b64encode(raw).decode('ascii')
 
 
 def put_image(group, path, x, y, w, h):

@@ -54,14 +54,40 @@ JS = r"""
 
   const BLOCK_SELECTORS = (window.__BLOCK_SELECTORS__ || []);
   BLOCK_SELECTORS.forEach(sel => {
+    let bi = 0;
     document.querySelectorAll(sel).forEach(el => {
       const r = el.getBoundingClientRect();
       if (r.width < 1 || r.height < 1) return;
-      out.blocks.push({sel, cls: String(el.className || ''), x: +r.x.toFixed(2),
+      out.blocks.push({sel, index: bi++, cls: String(el.className || ''), x: +r.x.toFixed(2),
         y: +r.y.toFixed(2), w: +r.width.toFixed(2), h: +r.height.toFixed(2)});
     });
   });
 
+  const SEMANTIC_MAP = {filter:'filter-bar',filters:'filter-bar','filter-bar':'filter-bar','filter-item':'filter-bar',query:'filter-bar',search:'filter-bar',panel:'panel-header','panel-header':'panel-header',kpi:'panel-header',title:'panel-header',thead:'table-header','table-header':'table-header',table:'table-rows','table-row':'table-rows','table-body':'table-rows'};
+  const semanticOf = (el) => {
+    for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+      for (const key of ['data-name', 'data-el']) {
+        const raw = String(e.getAttribute(key) || '').trim();
+        if (!raw) continue;
+        for (const part of raw.split(/[>\s/]+/).filter(Boolean)) {
+          for (const k of Object.keys(SEMANTIC_MAP).sort((a, b) => b.length - a.length)) {
+            if (part === k || part.startsWith(k + '__') || part.startsWith(k + '-') || part.startsWith(k + '_')) return SEMANTIC_MAP[k];
+          }
+        }
+      }
+    }
+    return '';
+  };
+  const namesOf = (el) => {
+    const found = [];
+    for (let e = el; e && e !== document.documentElement && found.length < 8; e = e.parentElement) {
+      for (const key of ['data-name', 'data-el']) {
+        const raw = String(e.getAttribute(key) || '').trim();
+        if (raw && !found.includes(raw)) found.push(raw);
+      }
+    }
+    return found;
+  };
   document.querySelectorAll('*').forEach(el => {
     const hasText = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
     if (!hasText) return;
@@ -70,7 +96,8 @@ JS = r"""
     if (r.width < 1 || r.height < 1) return;
     if (cs.visibility === 'hidden' || cs.display === 'none') return;
     out.text.push({text: el.textContent.replace(/\s+/g, ' ').trim(), tag: el.tagName,
-      cls: String(el.className || ''), x: +r.x.toFixed(2), y: +r.y.toFixed(2),
+      cls: String(el.className || ''), dataName: semanticOf(el), names: namesOf(el),
+      x: +r.x.toFixed(2), y: +r.y.toFixed(2), w: +r.width.toFixed(2), h: +r.height.toFixed(2),
       w: +r.width.toFixed(2), h: +r.height.toFixed(2),
       fontSize: cs.fontSize, fontWeight: cs.fontWeight, color: cs.color,
       textAlign: cs.textAlign, letterSpacing: cs.letterSpacing, lineHeight: cs.lineHeight,

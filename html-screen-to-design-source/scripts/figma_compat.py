@@ -101,6 +101,11 @@ def main():
     for g in root.iter(NS + 'g'):
         nm = (g.get('data-name') or g.get('id') or '')
         kids = [c for c in g if c.tag in (NS + 'g', NS + 'image', NS + 'text')]
+        # A module/section group that holds data-layer sublayers is the required handoff
+        # structure, not a stray wrapper.
+        if (g.get('id', '').startswith(('section-', 'page-background'))
+                or any(c.get('data-layer') for c in g)):
+            continue
         if not g.get('data-export') and any(h in nm.lower() for h in WRAPPER_HINT):
             wrappers.append('%s(%d children)' % (nm, len(kids)))
     if wrappers:
