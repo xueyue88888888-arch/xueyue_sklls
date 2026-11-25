@@ -3,7 +3,7 @@
 **Turn a rendered HTML screen into a layered, pixel-verified SVG design source — for Figma, Lanhu (蓝湖), MasterGo, or any hand-off tool.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Skills](https://img.shields.io/badge/skills-4-brightgreen.svg)](#skills)
+[![Skills](https://img.shields.io/badge/skills-6-brightgreen.svg)](#skills)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](../../issues)
 
 Designers can't receive a screenshot. Developers can't build from a picture.
@@ -38,7 +38,9 @@ These three skills cover the whole path, and every step is verified with numbers
 | **[big-screen-design-brief](big-screen-design-brief/)** | Turns a reference image (or a text brief) into an agent-ready spec: element inventory → four-way classification (**CSS / vector / AI-generated image / data chart**) → brief + image prompts, plus a **visual-quality bar** (glow discipline, type scale, depth, spacing rhythm) | A designer says "make it look like this" and needs a sliceable *and good-looking* screen |
 | **[html-screen-to-design-source](html-screen-to-design-source/)** | Freezes the page, measures the DOM, slices by element type, assembles a layered SVG, verifies it pixel by pixel, audits design-tool compatibility | You have the HTML and need a design source + downloadable slices |
 | **[figma-lanhu-export-marker](figma-lanhu-export-marker/)** | Figma plugin + manifest generator: batch-organize layers and mark **every instance** of every asset for export before uploading to Lanhu | Imports land in Figma, but only a handful of images are downloadable |
-| **[sql-standard](sql-standard/)** | Data-governance-grade SQL standard plus a zero-dependency gate: 17 database-agnostic rules plus a Doris dialect profile (21 in total), a delivery contract (purpose / caliber / reconciliation) and three templates (KPI · drill-down · latest-record). 22 regression cases keep every rule honest. Blocks the errors that return wrong numbers without erroring | Any SQL is about to ship — report datasets, drill-downs, batch jobs, ad-hoc queries. Exit code doubles as a commit hook |
+| **[agent-table-dedup](agent-table-dedup/)** | Make an agent reliably find duplicate keys across many Excel/CSV files: copy-paste prompt + 60-second verification checklist + trap test files. Guards against silent under-read, 20-digit precision loss, lost leading zeros, and false "dedupe" that deletes real rows | "Help me find duplicate invoice numbers across these sheets" — and you need the result to be auditable, not just fast |
+| **[sql-standard](sql-standard/)** | Data-governance-grade SQL standard plus a zero-dependency gate: 17 database-agnostic rules plus a Doris dialect profile (21 in total), MySQL/Postgres tables in the dialect cheat-sheet, a delivery contract (purpose / caliber / reconciliation) and three templates (KPI · drill-down · latest-record). Blocks the errors that return wrong numbers without erroring | Any SQL is about to ship — report datasets, drill-downs, batch jobs, ad-hoc queries. Exit code doubles as a commit hook |
+| **[image-to-editable-fvs](image-to-editable-fvs/)** | Reference screenshot → FVS that keeps its numbers alive: the original image becomes the visual base, chart regions are erased and native charts are overlaid. Measured 0.87 similarity with every chart editable, one real project end to end | "Make the dashboard look exactly like this picture, but let me change the data" — without rebuilding the layout by hand |
 
 ```mermaid
 flowchart LR
@@ -50,6 +52,15 @@ flowchart LR
   F --> G["Figma / Lanhu<br/>every asset downloadable"]
   G --> H["BI / FVS developer<br/>charts rebuilt natively"]
 ```
+
+> **Model requirement**: the skills that take a reference image — `big-screen-design-brief`,
+> `html-screen-to-design-source` (image entry) and `image-to-editable-fvs` — must be driven
+> by a **multimodal model with vision + OCR**. A text-only model will fabricate copy and
+> coordinates. The pure HTML → design-source path has no such requirement.
+
+A separate, lighter skill sits outside that pipeline: **agent-table-dedup** makes an agent
+reliably find duplicate keys across spreadsheets — prompt template, verification checklist,
+and trap files, no web tool required.
 
 ---
 
@@ -121,14 +132,27 @@ skills/
 ├── big-screen-design-brief/       # upstream: reference image → brief
 │   ├── SKILL.md
 │   └── references/                # asset classification · AI image prompts · visual quality bar
-├── html-screen-to-design-source/  # middle: HTML → design source
-│   ├── SKILL.md
-│   ├── scripts/                   # measure · slice · build · verify · compat audit
-│   └── references/                # pitfalls · design-tool compatibility matrix
+├── html-screen-to-design-source/  # middle: HTML or reference image → layered design source
+│   ├── SKILL.md                   # includes the 3.6 / 3.7 acceptance gates
+│   ├── scripts/                   # preflight · measure · slice · assemble · semantics · charts · verify · compat
+│   └── references/                # layer spec · pipeline gaps · semantic layering · pitfalls · compatibility matrix
 ├── figma-lanhu-export-marker/     # downstream: mark everything exportable
 │   ├── SKILL.md
 │   ├── plugin/                    # Figma plugin (v6, manifest-driven)
 │   └── scripts/                   # build_manifest.py
+├── image-to-editable-fvs/         # last mile: reference image → FVS whose charts stay editable
+│   ├── SKILL.md
+│   ├── scripts/                   # erase-chart-regions.cjs · merge-editable-fvs.cjs
+│   └── references/                # measured case
+├── agent-table-dedup/             # standalone: reliable agent-based spreadsheet dedup
+│   ├── SKILL.md                   # prompt templates + verification checklist
+│   └── references/                # trap test cases
+├── sql-standard/                  # standalone: data-governance SQL gate
+│   ├── SKILL.md
+│   ├── rules/                     # 17 database-agnostic + Doris dialect profile
+│   ├── templates/                 # KPI · drill-down · latest-record
+│   ├── cases/                     # one must-fail per rule, plus a must-pass
+│   └── bin/                       # sqlguard.py · selftest.py
 ├── install.ps1 / install.sh       # sync skills into the local agent directory
 └── .github/workflows/validate.yml # CI: frontmatter · py_compile · node --check · size guard
 ```
@@ -169,6 +193,12 @@ MIT — see [LICENSE](LICENSE). Use it commercially, fork it, ship it.
 
 把**已经渲染出来的 HTML 大屏**，变成**可交付的设计源**：分层 SVG + 全套切图 PNG + 可点选可标注的稿件。
 给设计师用、给开发用，不给截图。
+
+### 模型要求
+
+吃参考图的那条路（`big-screen-design-brief`、`html-screen-to-design-source` 的图片入口、
+`image-to-editable-fvs`）**必须用多模态模型**——能看图、能读图里的文字（OCR）。纯文本模型
+会编造文案和坐标，而且下游查不出来。纯 HTML → 设计源这条路不受影响。
 
 ### 三个技能
 
