@@ -14,7 +14,7 @@
 figma.showUI(__html__, { width: 520, height: 720, title: '图层整理与导出标记 v6' });
 
 // ---------------------------------------------------------------- 预设清单
-// 一鸣大屏（61 类）作为示例；换项目时用「粘贴清单」覆盖，或点「自动推断」。
+// 客户大屏（61 类）作为示例；换项目时用「粘贴清单」覆盖，或点「自动推断」。
 const PRESET = [
   'image__bg-top', 'image__header-logo', 'image__title-decoration', 'image__brand-slogan',
   'image__sales-showcase', 'image__location', 'image__distribution-map',
