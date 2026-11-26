@@ -6,7 +6,7 @@
 [![Skills](https://img.shields.io/badge/skills-6-brightgreen.svg)](#skills)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](../../issues)
 
-> **Online tools & knowledge base** — [SVG → FineReport FVS converter](https://xueyue.zckj.store/tools/svg2fvs) · [Excel → CPT converter](https://xueyue.zckj.store/tools/excel2cpt) · [3,400+ FanRuan battle-tested articles](https://xueyue.zckj.store/kb) · [FVS chart plugin (8 types)](https://xueyue.zckj.store/plugin).
+> Online tools & notes — [xueyue.zckj.store](https://xueyue.zckj.store)
 
 Designers can't receive a screenshot. Developers can't build from a picture.
 This repo closes that gap: **a screen that already exists as HTML becomes a real design file** —
